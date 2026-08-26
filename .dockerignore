@@ -1,0 +1,23 @@
+# Secrets and Telegram session files
+.env
+.env.*
+*.session
+*.session-journal
+
+# Local environments and Python cache
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Version-control and local agent metadata
+.git/
+.gitignore
+.clinerules/
+
+# Local logs and generated files
+*.log
+filesharingbot.log*
+tests/__pycache__/

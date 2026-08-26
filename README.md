@@ -57,6 +57,19 @@ With the modern Docker Compose plugin, the equivalent command is:
 docker compose up -d --build --force-recreate
 ```
 
+The Compose file should provide `.env` through `env_file`; `.dockerignore` prevents
+that file, Telegram sessions, local environments, logs, and Git metadata from being
+copied into the Docker image by `COPY . .`. After rebuilding, you can verify an image
+does not contain those files without exposing any environment values:
+
+```bash
+docker run --rm --entrypoint sh teledrop-bot-teledrop-bot -c \
+  'test ! -e /app/.env && test ! -e /app/Bot.session && test ! -d /app/.git && echo "image hygiene: ok"'
+```
+
+Replace `teledrop-bot-teledrop-bot` with the image name shown by
+`docker images` or `docker compose images`.
+
 #### Run locally on Windows
 
 Copy `.env.example` to `.env`, then replace every `REPLACE_*` value with your
