@@ -6,6 +6,8 @@ from logging.handlers import RotatingFileHandler
 
 from dotenv import load_dotenv
 
+from config_helpers import normalize_env_text
+
 
 # Load local development settings when a .env file is present. Secrets stay
 # outside source control because .env is ignored by the repository.
@@ -68,24 +70,26 @@ except ValueError as exc:
     raise RuntimeError("ADMINS must contain space-separated integer Telegram IDs") from exc
 ADMINS = sorted(set(ADMINS + [OWNER_ID]))
 
-START_MSG = os.environ.get("START_MESSAGE", "").strip() or (
+START_MSG = normalize_env_text(os.environ.get("START_MESSAGE", "").strip()) or (
     "<b>Halo {mention}! Saya dapat membagikan file melalui tautan sementara.</b>"
 )
-FORCE_MSG = os.environ.get("FORCE_SUB_MESSAGE", "").strip() or (
+FORCE_MSG = normalize_env_text(os.environ.get("FORCE_SUB_MESSAGE", "").strip()) or (
     "👋 Hello {first} {last}\n\n"
     "Kamu harus bergabung di Channel/Grup kami terlebih dahulu untuk melihat File/Link yang kami bagikan\n\n"
     "Silakan join ke Channel & Group terlebih dahulu kemudian klik tombol muat ulang dibawah untuk melanjutkan"
 )
 PICS = os.environ.get("PICS", "").split()
-CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION") or None
+CUSTOM_CAPTION = normalize_env_text(os.environ.get("CUSTOM_CAPTION", "")) or None
 PROTECT_CONTENT = os.environ.get("PROTECT_CONTENT", "False").lower() == "true"
 DISABLE_CHANNEL_BUTTON = os.environ.get("DISABLE_CHANNEL_BUTTON", "False").lower() == "true"
 ALLOW_LEGACY_LINKS = os.environ.get("ALLOW_LEGACY_LINKS", "False").lower() == "true"
 MAIN_CHANNEL_URL = os.environ.get("MAIN_CHANNEL_URL", "").strip()
 SOURCE_CODE_URL = os.environ.get("SOURCE_CODE_URL", "").strip()
-BOT_STATS_TEXT = os.environ.get("BOT_STATS_TEXT", "").strip() or "<b>BOT UPTIME</b>\n{uptime}"
-USER_REPLY_TEXT = os.environ.get(
-    "USER_REPLY_TEXT", "<b>Pesan ini hanya dapat digunakan untuk berbagi file.</b>"
+BOT_STATS_TEXT = normalize_env_text(os.environ.get("BOT_STATS_TEXT", "").strip()) or (
+    "<b>BOT UPTIME</b>\n{uptime}"
+)
+USER_REPLY_TEXT = normalize_env_text(
+    os.environ.get("USER_REPLY_TEXT", "<b>Pesan ini hanya dapat digunakan untuk berbagi file.</b>")
 )
 
 LOG_FILE_NAME = os.environ.get("LOG_FILE_NAME", "filesharingbot.log")

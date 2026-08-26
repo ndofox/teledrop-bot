@@ -2,6 +2,7 @@ import unittest
 
 from security import extract_token, is_valid_token, new_token, share_payload, token_hash
 from cleanup_policy import cleanup_is_exhausted, cleanup_retry_delay
+from config_helpers import normalize_env_text
 
 
 class SecurityTests(unittest.TestCase):
@@ -28,6 +29,10 @@ class SecurityTests(unittest.TestCase):
     def test_cleanup_retry_exhaustion(self):
         self.assertFalse(cleanup_is_exhausted(4, 5))
         self.assertTrue(cleanup_is_exhausted(5, 5))
+
+    def test_normalizes_single_and_double_escaped_newlines(self):
+        self.assertEqual(normalize_env_text(r"Hello\\n\\nWorld"), "Hello\n\nWorld")
+        self.assertEqual(normalize_env_text(r"Hello\n\nWorld"), "Hello\n\nWorld")
 
 
 if __name__ == "__main__":

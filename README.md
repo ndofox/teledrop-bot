@@ -76,6 +76,11 @@ Copy `.env.example` to `.env`, then replace every `REPLACE_*` value with your
 own credential or Telegram ID. The `.env` file is ignored by Git and must not
 be committed or shared.
 
+Message settings such as `START_MESSAGE`, `FORCE_SUB_MESSAGE`, `CUSTOM_CAPTION`,
+`BOT_STATS_TEXT`, and `USER_REPLY_TEXT` support `\n` for line breaks. The bot also
+normalizes the older `\\n` form. Remember to replace the example force-sub text in
+your production `.env`; changing `.env.example` does not modify an existing `.env`.
+
 In Git Bash:
 
 ```bash
