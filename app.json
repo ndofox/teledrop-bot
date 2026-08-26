@@ -88,6 +88,21 @@
       "description": "HTTP health endpoint port",
       "value": "8080",
       "required": false
+    },
+    "CLEANUP_MAX_ATTEMPTS": {
+      "description": "Maximum automatic cleanup failures before a delivery is marked exhausted",
+      "value": "5",
+      "required": false
+    },
+    "CLEANUP_RETRY_BASE_SECONDS": {
+      "description": "Initial cleanup retry backoff in seconds",
+      "value": "60",
+      "required": false
+    },
+    "CLEANUP_RETRY_MAX_SECONDS": {
+      "description": "Maximum cleanup retry backoff in seconds",
+      "value": "3600",
+      "required": false
     }
   },
   "buildpacks": [

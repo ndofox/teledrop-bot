@@ -122,9 +122,16 @@ class Bot(Client):
                                 pass
                             await mark_delivery_deleted(delivery["_id"])
                         else:
-                            await mark_delivery_attempt(delivery["_id"])
+                            if await mark_delivery_attempt(delivery["_id"]):
+                                self.LOGGER(__name__).error(
+                                    "Delivery cleanup exhausted retries for %s", delivery["_id"]
+                                )
                     except Exception:
-                        await mark_delivery_attempt(delivery["_id"])
+                        if await mark_delivery_attempt(delivery["_id"]):
+                            self.LOGGER(__name__).error(
+                                "Persistent delivery cleanup exhausted retries for %s",
+                                delivery["_id"],
+                            )
                         self.LOGGER(__name__).exception("Persistent delivery cleanup failed")
             except asyncio.CancelledError:
                 raise

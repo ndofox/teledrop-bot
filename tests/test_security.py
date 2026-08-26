@@ -1,6 +1,7 @@
 import unittest
 
 from security import extract_token, is_valid_token, new_token, share_payload, token_hash
+from cleanup_policy import cleanup_is_exhausted, cleanup_retry_delay
 
 
 class SecurityTests(unittest.TestCase):
@@ -18,6 +19,15 @@ class SecurityTests(unittest.TestCase):
     def test_share_payload_rejects_invalid_token(self):
         with self.assertRaises(ValueError):
             share_payload("not-a-token")
+
+    def test_cleanup_retry_uses_bounded_exponential_backoff(self):
+        self.assertEqual(cleanup_retry_delay(1, 60, 3600), 60)
+        self.assertEqual(cleanup_retry_delay(2, 60, 3600), 120)
+        self.assertEqual(cleanup_retry_delay(8, 60, 3600), 3600)
+
+    def test_cleanup_retry_exhaustion(self):
+        self.assertFalse(cleanup_is_exhausted(4, 5))
+        self.assertTrue(cleanup_is_exhausted(5, 5))
 
 
 if __name__ == "__main__":

@@ -6,7 +6,15 @@ from typing import Any
 
 import pymongo
 
-from config import DB_NAME, DB_URI, LINK_TTL
+from config import (
+    CLEANUP_MAX_ATTEMPTS,
+    CLEANUP_RETRY_BASE_SECONDS,
+    CLEANUP_RETRY_MAX_SECONDS,
+    DB_NAME,
+    DB_URI,
+    LINK_TTL,
+)
+from cleanup_policy import cleanup_is_exhausted, cleanup_retry_delay
 from security import new_token, token_hash
 
 
@@ -26,6 +34,15 @@ def _ensure_indexes() -> None:
     delivery_data.create_index(
         [("deleted_at", pymongo.ASCENDING), ("delete_at", pymongo.ASCENDING)],
         name="deliveries_due_lookup",
+    )
+    delivery_data.create_index(
+        [
+            ("deleted_at", pymongo.ASCENDING),
+            ("cleanup_exhausted", pymongo.ASCENDING),
+            ("delete_at", pymongo.ASCENDING),
+            ("next_attempt_at", pymongo.ASCENDING),
+        ],
+        name="deliveries_retry_lookup",
     )
 
 
@@ -109,8 +126,10 @@ async def create_delivery(chat_id: int, message_ids: list[int], notification_id:
             "message_ids": message_ids,
             "notification_id": notification_id,
             "delete_at": delete_at,
+            "next_attempt_at": delete_at,
             "deleted_at": None,
             "attempts": 0,
+            "cleanup_exhausted": False,
         },
     )
 
@@ -119,7 +138,15 @@ async def due_deliveries(limit: int = 100) -> list[dict[str, Any]]:
     return await asyncio.to_thread(
         lambda: list(
             delivery_data.find(
-                {"deleted_at": None, "delete_at": {"$lte": utc_now()}},
+                {
+                    "deleted_at": None,
+                    "cleanup_exhausted": {"$ne": True},
+                    "delete_at": {"$lte": utc_now()},
+                    "$or": [
+                        {"next_attempt_at": {"$exists": False}},
+                        {"next_attempt_at": {"$lte": utc_now()}},
+                    ],
+                },
                 {"chat_id": 1, "message_ids": 1, "notification_id": 1},
             ).limit(limit)
         )
@@ -130,9 +157,31 @@ async def mark_delivery_deleted(delivery_id: Any) -> None:
     await asyncio.to_thread(
         delivery_data.update_one,
         {"_id": delivery_id},
-        {"$set": {"deleted_at": utc_now()}, "$inc": {"attempts": 1}},
+        {"$set": {"deleted_at": utc_now(), "cleanup_exhausted": False}},
     )
 
 
-async def mark_delivery_attempt(delivery_id: Any) -> None:
-    await asyncio.to_thread(delivery_data.update_one, {"_id": delivery_id}, {"$inc": {"attempts": 1}})
+def _mark_delivery_attempt(delivery_id: Any) -> bool:
+    """Record one failed cleanup and return whether retries are exhausted."""
+    document = delivery_data.find_one({"_id": delivery_id}, {"attempts": 1}) or {}
+    failure_number = int(document.get("attempts", 0)) + 1
+    now = utc_now()
+    exhausted = cleanup_is_exhausted(failure_number, CLEANUP_MAX_ATTEMPTS)
+    update = {
+        "$inc": {"attempts": 1},
+        "$set": {"cleanup_exhausted": exhausted},
+    }
+    if exhausted:
+        update["$set"]["next_attempt_at"] = None
+    else:
+        update["$set"]["next_attempt_at"] = now + timedelta(
+            seconds=cleanup_retry_delay(
+                failure_number, CLEANUP_RETRY_BASE_SECONDS, CLEANUP_RETRY_MAX_SECONDS
+            )
+        )
+    result = delivery_data.update_one({"_id": delivery_id}, update)
+    return result.modified_count == 1 and exhausted
+
+
+async def mark_delivery_attempt(delivery_id: Any) -> bool:
+    return await asyncio.to_thread(_mark_delivery_attempt, delivery_id)

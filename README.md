@@ -201,6 +201,9 @@ informasi Telegram seperti `@userinfobot`; jangan menyalin ID bot atau ID channe
 ### EXTRA VARIABLES
 * `PORT` Port HTTP health endpoint; default `8080`
 * `CLEANUP_INTERVAL` Interval pengecekan delivery yang kedaluwarsa dalam detik; default `60`
+* `CLEANUP_MAX_ATTEMPTS` Batas kegagalan cleanup otomatis sebelum delivery ditandai exhausted; default `5`
+* `CLEANUP_RETRY_BASE_SECONDS` Backoff awal retry cleanup; default `60`
+* `CLEANUP_RETRY_MAX_SECONDS` Batas maksimum backoff retry cleanup; default `3600`
 * `MAX_BATCH_MESSAGES` Batas jumlah pesan dalam satu batch; default `100`
 * `TG_BOT_WORKERS` Jumlah worker Pyrogram; default `4`
 * `CUSTOM_CAPTION` Caption custom untuk dokumen; gunakan `{filename}` dan `{previouscaption}`
@@ -216,6 +219,9 @@ informasi Telegram seperti `@userinfobot`; jangan menyalin ID bot atau ID channe
 ```env
 PORT=8080
 CLEANUP_INTERVAL=60
+CLEANUP_MAX_ATTEMPTS=5
+CLEANUP_RETRY_BASE_SECONDS=60
+CLEANUP_RETRY_MAX_SECONDS=3600
 MAX_BATCH_MESSAGES=100
 TG_BOT_WORKERS=4
 ADMINS=123456789 987654321
@@ -230,9 +236,25 @@ BOT_STATS_TEXT="<b>📊 Status TeleDrop</b>\n\n✅ Online\n⏱ Uptime: <code>{up
 USER_REPLY_TEXT="Silakan gunakan link file yang diberikan admin atau ketik /start."
 ```
 
-Semua perubahan `.env` memerlukan restart bot. `ADMINS` harus berisi Telegram user
+Semua perubahan `.env` memerlukan restart bot. Pada deployment Docker, lakukan
+`docker-compose up -d --build --force-recreate` agar environment terbaru dimuat.
+`ADMINS` harus berisi Telegram user
 ID numerik yang dipisahkan spasi, bukan username. Gunakan Telegram `file_id` untuk
 `PICS` agar pengiriman gambar tidak bergantung pada URL eksternal.
+
+### Health check dan cleanup retry
+
+Image Docker memiliki health check terhadap endpoint lokal `/`. Status container dapat
+diperiksa dengan:
+
+```bash
+docker inspect --format='{{json .State.Health}}' teledrop-bot
+```
+
+Delivery yang gagal dihapus tidak langsung dicoba pada setiap siklus. Bot menggunakan
+exponential backoff yang dibatasi oleh `CLEANUP_RETRY_MAX_SECONDS`. Setelah mencapai
+`CLEANUP_MAX_ATTEMPTS`, delivery ditandai `cleanup_exhausted=True` dan tidak diulang
+tanpa intervensi operasional. Record lama tanpa `next_attempt_at` tetap kompatibel.
 
 
 ### Fillings
