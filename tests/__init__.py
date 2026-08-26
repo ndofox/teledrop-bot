@@ -1,0 +1,1 @@
+"""Local project tests package; prevents discovery from importing another tests package."""

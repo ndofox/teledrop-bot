@@ -1,20 +1,6 @@
-pyrogram
-pyrofork==2.3.38 
-TgCrypto
-pyromod
-humanize
-schedule
-APscheduler
-# --- For-Database ------------ #
-pymongo
-motor
-dnspython
-# --- For-Web-Response ------- #
-aiohttp
-python-dotenv
-# --- For-Web-Response ------- #
-pytz
-requests
-bs4
-aiofiles
-asyncio
+pyrofork==2.3.38
+TgCrypto>=1.2.5,<2
+pymongo>=4.6,<5
+dnspython>=2.4,<3
+aiohttp>=3.9,<4
+python-dotenv>=1.0,<2

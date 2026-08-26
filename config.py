@@ -1,96 +1,97 @@
-#(©) PythonBotz 
+"""Validated configuration loaded exclusively from environment variables."""
 
-
-
-
-import os
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 
+from dotenv import load_dotenv
 
 
-#Bot token @Botfather
-TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "")
+# Load local development settings when a .env file is present. Secrets stay
+# outside source control because .env is ignored by the repository.
+load_dotenv()
 
-#Your API ID from my.telegram.org
-APP_ID = int(os.environ.get("APP_ID", ""))
 
-#Your API Hash from my.telegram.org
-API_HASH = os.environ.get("API_HASH", "")
+def _required(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
 
-#Your db channel Id
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", ""))
 
-#OWNER ID
-OWNER_ID = int(os.environ.get("OWNER_ID", ""))
+def _int(name: str, default: int | None = None, *, minimum: int | None = None) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        if default is None:
+            raw = _required(name)
+        else:
+            return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer") from exc
+    if minimum is not None and value < minimum:
+        raise RuntimeError(f"{name} must be >= {minimum}")
+    return value
 
-#Port
-PORT = os.environ.get("PORT", "8080")
 
-#Database 
-DB_URI = os.environ.get("DATABASE_URL", "")
-DB_NAME = os.environ.get("DATABASE_NAME", "filesharexbot")
+TG_BOT_TOKEN = _required("TG_BOT_TOKEN")
+APP_ID = _int("APP_ID", minimum=1)
+API_HASH = _required("API_HASH")
+CHANNEL_ID = _int("CHANNEL_ID")
+OWNER_ID = _int("OWNER_ID", minimum=1)
+PORT = _int("PORT", 8080, minimum=1)
+DB_URI = _required("DATABASE_URL")
+DB_NAME = os.environ.get("DATABASE_NAME", "filesharexbot").strip() or "filesharexbot"
 
-#Time in seconds for message Auto delete, put 0 to never delete
-TIME = int(os.environ.get("TIME", "86400"))
+# TIME controls delivered-message deletion. LINK_TTL controls link validity.
+TIME = _int("TIME", 86400, minimum=0)
+LINK_TTL = _int("LINK_TTL", 86400, minimum=60)
+CLEANUP_INTERVAL = _int("CLEANUP_INTERVAL", 60, minimum=5)
+MAX_BATCH_MESSAGES = _int("MAX_BATCH_MESSAGES", 100, minimum=1)
+TG_BOT_WORKERS = _int("TG_BOT_WORKERS", 4, minimum=1)
+TELEGRAM_API_TIMEOUT = _int("TELEGRAM_API_TIMEOUT", 30, minimum=1)
 
-#force sub channel id, if you want enable force sub
-FORCE_SUB_CHANNEL1 = int(os.environ.get("FORCE_SUB_CHANNEL1", "0"))
-#put 0 to disable
-FORCE_SUB_CHANNEL2 = int(os.environ.get("FORCE_SUB_CHANNEL2", "0"))#put 0 to disable
-FORCE_SUB_CHANNEL3 = int(os.environ.get("FORCE_SUB_CHANNEL3", "0"))#put 0 to disable
-FORCE_SUB_CHANNEL4 = int(os.environ.get("FORCE_SUB_CHANNEL4", "0"))#put 0 to disable
+FORCE_SUB_CHANNEL1 = _int("FORCE_SUB_CHANNEL1", 0)
+FORCE_SUB_CHANNEL2 = _int("FORCE_SUB_CHANNEL2", 0)
+FORCE_SUB_CHANNEL3 = _int("FORCE_SUB_CHANNEL3", 0)
+FORCE_SUB_CHANNEL4 = _int("FORCE_SUB_CHANNEL4", 0)
 
-TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", "4"))
-
-#start message
-START_MSG = os.environ.get("START_MESSAGE", "<b><blockquote>ʜᴇʏ !! {mention}\n\nɪ ᴀᴍ ғɪʟᴇ sᴛᴏʀᴇ ʙᴏᴛ, ɪ ᴄᴀɴ sᴛᴏʀᴇ ᴘʀɪᴠᴀᴛᴇ ғɪʟᴇs ɪɴ sᴘᴇᴄɪғɪᴇᴅ ᴄʜᴀɴɴᴇʟ ᴀɴᴅ ᴏᴛʜᴇʀ ᴜsᴇʀs ᴄᴀɴ ᴀᴄᴄᴇss ɪᴛ ғʀᴏᴍ sᴘᴇᴄɪᴀʟ ʟɪɴᴋ.</blockquote></b>")
 try:
-    ADMINS=[]
-    for x in (os.environ.get("ADMINS", "").split()):
-        ADMINS.append(int(x))
-except ValueError:
-        raise Exception("Your Admins list does not contain valid integers.")
+    ADMINS = [int(value) for value in os.environ.get("ADMINS", "").split()]
+except ValueError as exc:
+    raise RuntimeError("ADMINS must contain space-separated integer Telegram IDs") from exc
+ADMINS = sorted(set(ADMINS + [OWNER_ID]))
 
-#Force sub message 
-FORCE_MSG = os.environ.get("FORCE_SUB_MESSAGE", "ʜᴇʟʟᴏ {first}\n\n<b>ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟs ᴀɴᴅ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴏɴ ʀᴇʟᴏᴀᴅ button ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇꜱᴛᴇᴅ ꜰɪʟᴇ.</b>")
+START_MSG = os.environ.get("START_MESSAGE", "").strip() or (
+    "<b>Halo {mention}! Saya dapat membagikan file melalui tautan sementara.</b>"
+)
+FORCE_MSG = os.environ.get("FORCE_SUB_MESSAGE", "").strip() or (
+    "👋 Hello {first} {last}\n\n"
+    "Kamu harus bergabung di Channel/Grup kami terlebih dahulu untuk melihat File/Link yang kami bagikan\n\n"
+    "Silakan join ke Channel & Group terlebih dahulu kemudian klik tombol muat ulang dibawah untuk melanjutkan"
+)
+PICS = os.environ.get("PICS", "").split()
+CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION") or None
+PROTECT_CONTENT = os.environ.get("PROTECT_CONTENT", "False").lower() == "true"
+DISABLE_CHANNEL_BUTTON = os.environ.get("DISABLE_CHANNEL_BUTTON", "False").lower() == "true"
+ALLOW_LEGACY_LINKS = os.environ.get("ALLOW_LEGACY_LINKS", "False").lower() == "true"
+MAIN_CHANNEL_URL = os.environ.get("MAIN_CHANNEL_URL", "").strip()
+SOURCE_CODE_URL = os.environ.get("SOURCE_CODE_URL", "").strip()
+BOT_STATS_TEXT = os.environ.get("BOT_STATS_TEXT", "").strip() or "<b>BOT UPTIME</b>\n{uptime}"
+USER_REPLY_TEXT = os.environ.get(
+    "USER_REPLY_TEXT", "<b>Pesan ini hanya dapat digunakan untuk berbagi file.</b>"
+)
 
-# Start & Fsub Pics ----------------------------------- #
-
-#Collection of pics for Bot // #Optional but atleast one pic link should be replaced if you don't want predefined links
-PICS = (os.environ.get("PICS", "https://envs.sh/Vx5.jpg https://envs.sh/VxL.jpg https://envs.sh/Vxc.jpg https://envs.sh/V8O.jpg https://envs.sh/V8m.jpg https://envs.sh/V8X.jpg https://envs.sh/V8y.jpg")).split() #Required
-
-# Start & Fsub Pics ----------------------------------- #
-
-#set your Custom Caption here, Keep None for Disable Custom Caption
-CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION", None)
-
-#set True if you want to prevent users from forwarding files from bot
-PROTECT_CONTENT = True if os.environ.get('PROTECT_CONTENT', "False") == "True" else False
-
-#Set true if you want Disable your Channel Posts Share button
-DISABLE_CHANNEL_BUTTON = os.environ.get("DISABLE_CHANNEL_BUTTON", None) == 'True'
-
-BOT_STATS_TEXT = "<b>BOT UPTIME</b>\n{uptime}"
-USER_REPLY_TEXT = "<b>❌ Don't send me messages directly I'm only File Share bot !\n👨‍💻 Bot Devloper @metaui<\b>"
-
-ADMINS.append(OWNER_ID)
-ADMINS.append(1250450587)
-
-LOG_FILE_NAME = "filesharingbot.txt"
-
+LOG_FILE_NAME = os.environ.get("LOG_FILE_NAME", "filesharingbot.log")
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s - %(levelname)s] - %(name)s - %(message)s",
-    datefmt='%d-%b-%y %H:%M:%S',
+    datefmt="%d-%b-%y %H:%M:%S",
     handlers=[
-        RotatingFileHandler(
-            LOG_FILE_NAME,
-            maxBytes=50000000,
-            backupCount=10
-        ),
-        logging.StreamHandler()
-    ]
+        RotatingFileHandler(LOG_FILE_NAME, maxBytes=50_000_000, backupCount=10),
+        logging.StreamHandler(),
+    ],
 )
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 

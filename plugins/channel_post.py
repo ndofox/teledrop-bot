@@ -1,36 +1,42 @@
 #(©) PythonBotz 
 
-import asyncio
 from pyrogram import filters, Client
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 
 from bot import Bot
-from config import ADMINS, CHANNEL_ID, DISABLE_CHANNEL_BUTTON
-from helper_func import encode
+from config import ADMINS, CHANNEL_ID, DISABLE_CHANNEL_BUTTON, OWNER_ID, LOGGER
+from database.database import create_link
 
-@Bot.on_message(filters.private & filters.user(ADMINS) & ~filters.command(['start','restart','users','broadcast','forward','batch','genlink','stats']))
+log = LOGGER(__name__)
+
+@Bot.on_message(filters.private & filters.user(ADMINS) & ~filters.command([
+    'start', 'restart', 'users', 'broadcast', 'forward', 'batch', 'genlink',
+    'stats', 'revoke', 'help', 'ping', 'info',
+]))
 async def channel_post(client: Client, message: Message):
+    if (message.text or "").startswith("/"):
+        await message.reply_text("Command tidak dikenal. Gunakan /help.")
+        return
     reply_text = await message.reply_text("Please Wait...!", quote = True)
     try:
         post_message = await message.copy(chat_id = client.db_channel.id, disable_notification=True)
     except FloodWait as e:
-        await asyncio.sleep(e.x)
-        post_message = await message.copy(chat_id = client.db_channel.id, disable_notification=True)
+        import asyncio
+        await asyncio.sleep(e.value)
+        post_message = await message.copy(chat_id=client.db_channel.id, disable_notification=True)
     except Exception as e:
-        print(e)
+        log.exception("Could not copy message to database channel")
         await reply_text.edit_text("Something went Wrong..!")
         return
-    converted_id = post_message.id * abs(client.db_channel.id)
-    string = f"get-{converted_id}"
-    base64_string = await encode(string)
-    link = f"https://t.me/{client.username}?start={base64_string}"
+    token = await create_link([post_message.id], message.from_user.id)
+    link = f"https://t.me/{client.username}?start={token}"
 
     reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔁 Share URL", url=f'https://telegram.me/share/url?url={link}'),
-        InlineKeyboardButton(" View Post 👀", url=f'{link}')]])
+        [InlineKeyboardButton("Share URL", url=f'https://telegram.me/share/url?url={link}'),
+         InlineKeyboardButton("View Post", url=link)]])
 
-    await reply_text.edit(f"<b><pre>**Here is your link**\n\n**{link}**</pre>\n<u>Tap To Copy Code to copy Link</u>\n\n⚡ ᴅᴇᴠʟᴏᴘᴇʀ : <a href=https://t.me/HateXfree>ᯓ ʜᴀᴛᴇ ғʀᴇᴇ ᡣ𐭩</a></b>", reply_markup=reply_markup, disable_web_page_preview = True)
+    await reply_text.edit(f"<b>Link Anda:</b>\n<code>{link}</code>", reply_markup=reply_markup, disable_web_page_preview=True)
 
     if not DISABLE_CHANNEL_BUTTON:
         await post_message.edit_reply_markup(reply_markup)
@@ -41,13 +47,10 @@ async def new_post(client: Client, message: Message):
     if DISABLE_CHANNEL_BUTTON:
         return
 
-    converted_id = message.id * abs(client.db_channel.id)
-    string = f"get-{converted_id}"
-    base64_string = await encode(string)
-    link = f"https://t.me/{client.username}?start={base64_string}"
+    token = await create_link([message.id], OWNER_ID)
+    link = f"https://t.me/{client.username}?start={token}"
     reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔁 Share URL", url=f'https://telegram.me/share/url?url={link}')]])
     try:
         await message.edit_reply_markup(reply_markup)
-    except Exception as e:
-        print(e)
-        pass
+    except Exception:
+        log.exception("Could not add share button to channel post")

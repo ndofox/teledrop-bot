@@ -1,13 +1,12 @@
 {
-  "name": "TG File Share/Sharing Bot",
-  "description": "file sharing bot store posts and it can access by special links",
+  "name": "TeleDrop Bot",
+  "description": "Telegram file-sharing bot with expiring links and automatic cleanup",
   "keywords": [
     "telegram",
     "file",
     "sharing"
   ],
-  "repository": "https://github.com/atiiif/File-Sharing-Bot",
-  "logo": "https://ibb.co/FgPVtzw",
+  "repository": "https://github.com/ndofox/teledrop-bot",
   "env": {
     "TG_BOT_TOKEN": {
       "description": "Your Bot token, Get it from @Botfather",
@@ -15,7 +14,7 @@
     },
     "OWNER_ID": {
       "description": "An integer of consisting of your owner ID",
-      "value": "1250450587"
+      "value": ""
     },
     "APP_ID":{
       "description": "your app id, take it from my.telegram.org",
@@ -23,7 +22,7 @@
     },
     "DATABASE_URL": {
       "description": "Paste your mongo db url",
-      "value": "url"
+      "value": ""
     },
     "DATABASE_NAME":{
       "description": "Enter your DATABASE_NAME ",
@@ -33,13 +32,29 @@
       "description": "your api hash, take it from my.telegram.org",
       "value": ""
     },
-    "CHANNEL_ID":{
-      "description": "make a channel (database channel), then make the bot as admin in channel, and it's id",
-      "value": "-100"
+    "CHANNEL_ID": {
+      "description": "Database channel ID; add the bot as admin in this channel",
+      "value": ""
     },
-    "FORCE_SUB_CHANNEL":{
-      "description": "id of the channel or group, if you want enable force sub feature else put 0",
-      "value": "0"
+    "FORCE_SUB_CHANNEL1": {
+      "description": "Optional first force-sub channel/group ID; use 0 to disable",
+      "value": "0",
+      "required": false
+    },
+    "FORCE_SUB_CHANNEL2": {
+      "description": "Optional second force-sub channel/group ID; use 0 to disable",
+      "value": "0",
+      "required": false
+    },
+    "FORCE_SUB_CHANNEL3": {
+      "description": "Optional third force-sub channel/group ID; use 0 to disable",
+      "value": "0",
+      "required": false
+    },
+    "FORCE_SUB_CHANNEL4": {
+      "description": "Optional fourth force-sub channel/group ID; use 0 to disable",
+      "value": "0",
+      "required": false
     },
     "START_MESSAGE": {
       "description": "Optional: start message of bot, use HTML parsemode format",
@@ -47,7 +62,7 @@
     },
     "FORCE_SUB_MESSAGE": {
       "description": "Optional: Force Sub message of bot, use HTML parsemode format",
-      "value": "Hello {first}\n\n<b>You need to join in my Channel/Group to use me\n\nKindly Please join Channel</b>"
+      "value": "👋 Hello {first} {last}\\n\\nKamu harus bergabung di Channel/Grup kami terlebih dahulu untuk melihat File/Link yang kami bagikan\\n\\nSilakan join ke Channel & Group terlebih dahulu kemudian klik tombol muat ulang dibawah untuk melanjutkan"
     },
     "ADMINS": {
       "description": "A space separated list of user_ids of Admins, they can only create links",
@@ -57,6 +72,21 @@
     "PROTECT_CONTENT": {
       "description": "Protect contents from getting forwarded",
       "value": "False",
+      "required": false
+    },
+    "LINK_TTL": {
+      "description": "Share-link validity in seconds",
+      "value": "86400",
+      "required": false
+    },
+    "TIME": {
+      "description": "Delivered-file auto-delete delay in seconds; use 0 to disable",
+      "value": "86400",
+      "required": false
+    },
+    "PORT": {
+      "description": "HTTP health endpoint port",
+      "value": "8080",
       "required": false
     }
   },
@@ -72,4 +102,3 @@
     }
   }
 }
-
