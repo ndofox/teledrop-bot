@@ -41,6 +41,22 @@ pip3 install -r requirements.txt
 python3 main.py
 ````
 
+#### Deploy with Docker Compose
+
+After creating or changing `.env`, build and recreate the container so Docker
+loads the latest environment values:
+
+```bash
+cd /www/docker/teledrop-bot
+docker-compose up -d --build --force-recreate
+```
+
+With the modern Docker Compose plugin, the equivalent command is:
+
+```bash
+docker compose up -d --build --force-recreate
+```
+
 #### Run locally on Windows
 
 Copy `.env.example` to `.env`, then replace every `REPLACE_*` value with your
@@ -191,13 +207,13 @@ MAX_BATCH_MESSAGES=100
 TG_BOT_WORKERS=4
 ADMINS=123456789 987654321
 PICS=TELEGRAM_IMAGE_FILE_ID
-START_MESSAGE="<b>👋 Halo {mention}!</b>\\n\\nGunakan link yang diberikan admin untuk mengambil file."
-CUSTOM_CAPTION="<b>📁 {filename}</b>\\n\\n{previouscaption}"
+START_MESSAGE="<b>👋 Halo {mention}!</b>\n\nGunakan link yang diberikan admin untuk mengambil file."
+CUSTOM_CAPTION="<b>📁 {filename}</b>\n\n{previouscaption}"
 DISABLE_CHANNEL_BUTTON=False
 ALLOW_LEGACY_LINKS=False
 MAIN_CHANNEL_URL=https://t.me/channel_saya
 SOURCE_CODE_URL=https://github.com/ndofox/teledrop-bot
-BOT_STATS_TEXT="<b>📊 Status TeleDrop</b>\\n\\n✅ Online\\n⏱ Uptime: <code>{uptime}</code>"
+BOT_STATS_TEXT="<b>📊 Status TeleDrop</b>\n\n✅ Online\n⏱ Uptime: <code>{uptime}</code>"
 USER_REPLY_TEXT="Silakan gunakan link file yang diberikan admin atau ketik /start."
 ```
 
