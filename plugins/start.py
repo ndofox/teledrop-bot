@@ -126,7 +126,7 @@ def _force_sub_buttons(client):
         if channel_id:
             channel_buttons.append(
                 InlineKeyboardButton(
-                    f"JOIN CHANNEL {index}", url=getattr(client, f"invitelink{index}")
+                    f"➕ JOIN CHANNEL {index}", url=getattr(client, f"invitelink{index}")
                 )
             )
 
@@ -150,7 +150,7 @@ async def not_joined(client: Client, message: Message):
     token = extract_token(payload)
     buttons.append([
         InlineKeyboardButton(
-            "COBA LAGI", url=_share_link(client, token or "reload")
+            "✅ SAYA SUDAH JOIN, COBA LAGI.", url=_share_link(client, token or "reload")
         )
     ])
     markup = InlineKeyboardMarkup(buttons) if buttons else None
