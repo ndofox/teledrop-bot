@@ -28,6 +28,7 @@ class TelemetryTests(unittest.TestCase):
             {"registered": 100, "active_24h": 10, "active_7d": 40, "active_30d": 75}
         )
         self.assertIn("Registered: 100", text)
+        self.assertIn("Reachable: 90", format_user_statistics({"reachable": 90}))
         self.assertIn("Active 24 jam: 10", text)
         self.assertIn("Active 7 hari: 40", text)
         self.assertIn("Active 30 hari: 75", text)

@@ -9,8 +9,14 @@ from pyrogram.errors import FloodWait
 from config import (
     API_HASH,
     APP_ID,
+    APP_VERSION,
     CHANNEL_ID,
     CLEANUP_INTERVAL,
+    CONTROL_PLANE_HEARTBEAT_INTERVAL,
+    CONTROL_PLANE_INSTANCE_ID,
+    CONTROL_PLANE_SECRET,
+    CONTROL_PLANE_TIMEOUT,
+    CONTROL_PLANE_URL,
     FORCE_SUB_CHANNEL1,
     FORCE_SUB_CHANNEL2,
     FORCE_SUB_CHANNEL3,
@@ -22,6 +28,8 @@ from config import (
     TG_BOT_WORKERS,
     TELEGRAM_API_TIMEOUT,
 )
+from control_plane import heartbeat_payload, registration_payload, utc_isoformat
+from control_plane_client import ControlPlaneClient
 from database.database import due_deliveries, ensure_indexes, mark_delivery_attempt, mark_delivery_deleted
 from plugins import web_server
 
@@ -39,11 +47,20 @@ class Bot(Client):
         self.LOGGER = LOGGER
         self.cleanup_task = None
         self.web_runner = None
+        self.control_plane_task = None
+        self.control_plane = ControlPlaneClient(
+            CONTROL_PLANE_URL,
+            CONTROL_PLANE_INSTANCE_ID,
+            CONTROL_PLANE_SECRET,
+            CONTROL_PLANE_TIMEOUT,
+        )
+        self.telegram_bot_id = None
 
     async def start(self):
         await super().start()
         bot_user = await asyncio.wait_for(self.get_me(), timeout=TELEGRAM_API_TIMEOUT)
         self.uptime = datetime.now(timezone.utc)
+        self.telegram_bot_id = bot_user.id
         await ensure_indexes()
 
         for index, channel_id in enumerate(
@@ -77,15 +94,69 @@ class Bot(Client):
         self.username = bot_user.username
         self.LOGGER(__name__).info("Bot started as @%s", self.username)
 
-        self.web_runner = web.AppRunner(await web_server())
+        self.web_runner = web.AppRunner(await web_server(self))
         await self.web_runner.setup()
         await web.TCPSite(self.web_runner, "0.0.0.0", PORT).start()
         self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+        if self.control_plane.enabled:
+            self.control_plane_task = asyncio.create_task(self._control_plane_loop())
 
         try:
             await self.send_message(OWNER_ID, text="<b>Bot started.</b>")
         except Exception:
             self.LOGGER(__name__).warning("Could not send startup notification", exc_info=True)
+
+    def _control_plane_registration_payload(self):
+        return registration_payload(
+            instance_id=CONTROL_PLANE_INSTANCE_ID,
+            telegram_bot_id=self.telegram_bot_id,
+            username=self.username,
+            version=APP_VERSION,
+            started_at=self.uptime,
+        )
+
+    def _control_plane_heartbeat_payload(self, status: str = "online"):
+        return heartbeat_payload(
+            instance_id=CONTROL_PLANE_INSTANCE_ID,
+            telegram_bot_id=self.telegram_bot_id,
+            username=self.username,
+            version=APP_VERSION,
+            started_at=self.uptime,
+            uptime_seconds=int((datetime.now(timezone.utc) - self.uptime).total_seconds()),
+            status=status,
+        )
+
+    async def _control_plane_loop(self):
+        registered = False
+        while True:
+            try:
+                payload = (
+                    self._control_plane_heartbeat_payload()
+                    if registered
+                    else self._control_plane_registration_payload()
+                )
+                registered = await (
+                    self.control_plane.heartbeat(payload)
+                    if registered
+                    else self.control_plane.register(payload)
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                self.LOGGER(__name__).exception("Control-plane telemetry cycle failed")
+            await asyncio.sleep(CONTROL_PLANE_HEARTBEAT_INTERVAL)
+
+    def health_snapshot(self):
+        uptime_seconds = int((datetime.now(timezone.utc) - self.uptime).total_seconds()) if hasattr(self, "uptime") else 0
+        return {
+            "instance_id": CONTROL_PLANE_INSTANCE_ID or None,
+            "app_version": APP_VERSION,
+            "telegram_bot_id": self.telegram_bot_id,
+            "username": getattr(self, "username", None),
+            "started_at": utc_isoformat(self.uptime) if hasattr(self, "uptime") else None,
+            "uptime_seconds": max(0, uptime_seconds),
+            "control_plane": self.control_plane.health_snapshot(),
+        }
 
     async def _cleanup_loop(self):
         while True:
@@ -140,10 +211,18 @@ class Bot(Client):
             await asyncio.sleep(CLEANUP_INTERVAL)
 
     async def stop(self, *args):
+        if self.control_plane_task:
+            self.control_plane_task.cancel()
+            await asyncio.gather(self.control_plane_task, return_exceptions=True)
+            try:
+                await self.control_plane.heartbeat(self._control_plane_heartbeat_payload("stopping"))
+            except Exception:
+                self.LOGGER(__name__).warning("Could not send control-plane stopping status", exc_info=True)
         if self.cleanup_task:
             self.cleanup_task.cancel()
             await asyncio.gather(self.cleanup_task, return_exceptions=True)
         if self.web_runner:
             await self.web_runner.cleanup()
+        await self.control_plane.close()
         await super().stop()
         self.LOGGER(__name__).info("Bot stopped")

@@ -69,6 +69,36 @@
       "value": "",
       "required": false
     },
+    "APP_VERSION": {
+      "description": "Optional application version reported to the control plane",
+      "value": "2.2.0-dev",
+      "required": false
+    },
+    "CONTROL_PLANE_URL": {
+      "description": "Optional HTTPS URL of the central TeleDrop control plane",
+      "value": "",
+      "required": false
+    },
+    "CONTROL_PLANE_INSTANCE_ID": {
+      "description": "Unique non-secret identifier for this bot deployment",
+      "value": "",
+      "required": false
+    },
+    "CONTROL_PLANE_SECRET": {
+      "description": "Private HMAC secret for this bot deployment; never share it",
+      "value": "",
+      "required": false
+    },
+    "CONTROL_PLANE_HEARTBEAT_INTERVAL": {
+      "description": "Control-plane heartbeat interval in seconds; minimum 15",
+      "value": "60",
+      "required": false
+    },
+    "CONTROL_PLANE_TIMEOUT": {
+      "description": "Control-plane HTTP timeout in seconds",
+      "value": "10",
+      "required": false
+    },
     "PROTECT_CONTENT": {
       "description": "Protect contents from getting forwarded",
       "value": "False",

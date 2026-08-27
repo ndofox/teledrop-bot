@@ -35,6 +35,7 @@ def format_user_statistics(statistics: Mapping[str, int]) -> str:
     return (
         "<b>User telemetry</b>\n"
         f"Registered: {int(statistics.get('registered', 0))}\n"
+        f"Reachable: {int(statistics.get('reachable', 0))}\n"
         f"Active 24 jam: {int(statistics.get('active_24h', 0))}\n"
         f"Active 7 hari: {int(statistics.get('active_7d', 0))}\n"
         f"Active 30 hari: {int(statistics.get('active_30d', 0))}"

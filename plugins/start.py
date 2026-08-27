@@ -17,7 +17,7 @@ from config import (
     LOGGER,
 )
 from database.database import (
-    create_delivery, del_user, find_active_link, full_userbase,
+    create_delivery, find_active_link, mark_user_unreachable, reachable_userbase,
     revoke_link, touch_user, user_statistics, utc_now,
 )
 from helper_func import (
@@ -236,7 +236,7 @@ async def _send_to_users(client: Bot, message: Message, forward: bool):
                 "Gunakan /broadcast <teks>, atau reply sebuah pesan dengan /broadcast."
             )
         return
-    users = await full_userbase()
+    users = await reachable_userbase()
     status = await message.reply_text(f"Mengirim ke {len(users)} user...")
     successful = blocked = deleted = failed = 0
     for chat_id in users:
@@ -260,19 +260,19 @@ async def _send_to_users(client: Bot, message: Message, forward: bool):
                     await source.copy(chat_id)
                 successful += 1
             except UserIsBlocked:
-                await del_user(chat_id)
+                await mark_user_unreachable(chat_id, "blocked")
                 blocked += 1
             except InputUserDeactivated:
-                await del_user(chat_id)
+                await mark_user_unreachable(chat_id, "deleted")
                 deleted += 1
             except Exception:
                 failed += 1
                 log.exception("Broadcast retry failed for a user")
         except UserIsBlocked:
-            await del_user(chat_id)
+            await mark_user_unreachable(chat_id, "blocked")
             blocked += 1
         except InputUserDeactivated:
-            await del_user(chat_id)
+            await mark_user_unreachable(chat_id, "deleted")
             deleted += 1
         except Exception:
             failed += 1

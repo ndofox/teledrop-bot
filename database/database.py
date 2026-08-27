@@ -27,7 +27,10 @@ delivery_data = database["deliveries"]
 
 
 def _ensure_indexes() -> None:
-    user_data.create_index("last_seen_at", name="users_last_seen_lookup")
+    user_data.create_index(
+        [("last_seen_at", pymongo.DESCENDING), ("blocked_at", pymongo.ASCENDING), ("deleted_at", pymongo.ASCENDING)],
+        name="users_activity_lookup",
+    )
     link_data.create_index("token_hash", unique=True, name="share_links_token_hash")
     link_data.create_index(
         [("expires_at", pymongo.ASCENDING), ("revoked_at", pymongo.ASCENDING)],
@@ -77,7 +80,12 @@ async def touch_user(user_id: int, interaction_type: str = "message") -> None:
         {"_id": user_id},
         {
             "$setOnInsert": {"created_at": now},
-            "$set": {"last_seen_at": now, "last_interaction_type": interaction_type.strip()},
+            "$set": {
+                "last_seen_at": now,
+                "last_interaction_type": interaction_type.strip(),
+                "blocked_at": None,
+                "deleted_at": None,
+            },
         },
         upsert=True,
     )
@@ -87,15 +95,32 @@ async def full_userbase() -> list[int]:
     return await asyncio.to_thread(lambda: [doc["_id"] for doc in user_data.find({}, {"_id": 1})])
 
 
+async def reachable_userbase() -> list[int]:
+    """Return users not known to have blocked or left Telegram."""
+    return await asyncio.to_thread(
+        lambda: [
+            doc["_id"]
+            for doc in user_data.find(
+                {"blocked_at": None, "deleted_at": None}, {"_id": 1}
+            )
+        ]
+    )
+
+
 async def user_statistics(now: datetime | None = None) -> dict[str, int]:
     """Return registered and rolling active-user counters."""
     reference = now or utc_now()
 
     def _count_statistics() -> dict[str, int]:
         statistics = {"registered": user_data.count_documents({})}
+        reachable_filter = {"blocked_at": None, "deleted_at": None}
+        statistics["reachable"] = user_data.count_documents(reachable_filter)
         for name, days in ACTIVITY_WINDOWS:
             statistics[name] = user_data.count_documents(
-                {"last_seen_at": {"$gte": activity_cutoff(days, now=reference)}}
+                {
+                    **reachable_filter,
+                    "last_seen_at": {"$gte": activity_cutoff(days, now=reference)},
+                }
             )
         return statistics
 
@@ -104,6 +129,18 @@ async def user_statistics(now: datetime | None = None) -> dict[str, int]:
 
 async def del_user(user_id: int) -> None:
     await asyncio.to_thread(user_data.delete_one, {"_id": user_id})
+
+
+async def mark_user_unreachable(user_id: int, reason: str) -> None:
+    """Keep user history while excluding a blocked/deleted account from delivery."""
+    if reason not in {"blocked", "deleted"}:
+        raise ValueError("reason must be blocked or deleted")
+    field = "blocked_at" if reason == "blocked" else "deleted_at"
+    await asyncio.to_thread(
+        user_data.update_one,
+        {"_id": user_id},
+        {"$set": {field: utc_now()}},
+    )
 
 
 async def create_link(message_ids: list[int], created_by: int, ttl_seconds: int = LINK_TTL) -> str:

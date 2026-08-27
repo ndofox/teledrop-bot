@@ -23,6 +23,22 @@ Source repository: [ndofox/teledrop-bot](https://github.com/ndofox/teledrop-bot)
 - Can be deployed on a VPS or a compatible process-based platform.
 - Links expire automatically and can be revoked with `/revoke`.
 - Delivered files can be deleted persistently after `TIME` seconds.
+- Local user telemetry: registered, reachable, and active users for 24 hours, 7 days, and 30 days.
+- Optional control-plane agent identity, registration, heartbeat, and safe health metadata.
+
+### Status pengembangan
+
+| Phase | Status | Ringkasan |
+|---|---|---|
+| Phase 1 — Local telemetry | Selesai | `last_seen_at`, registered/reachable/active metrics, dan soft-state user unreachable |
+| Phase 2 — Agent identity & registration foundation | Selesai | Instance ID, metadata bot, signed registration/heartbeat, dan health metadata |
+| Phase 2A — Control-plane server | Berikutnya | Server validasi HMAC, replay protection, dan daftar instance |
+| Phase 2B — Central metrics | Direncanakan | Ingestion telemetry dan agregasi lintas bot |
+| Phase 3 — Super broadcast | Direncanakan | Queue lintas bot dengan satu pesan per Telegram `user_id` |
+| Phase 4 — Super-admin interface | Direncanakan | Telegram manager bot dan web dashboard |
+
+Detail kontrak agent, keamanan, keputusan arsitektur, dan roadmap berkelanjutan ada di
+[`docs/CONTROL_PLANE.md`](docs/CONTROL_PLANE.md).
 
 ### Setup
 
@@ -136,7 +152,7 @@ ID pada `ADMINS` adalah ID user Telegram, bukan username, ID bot, atau ID channe
 - `/broadcast teks` mengirim teks baru tanpa perlu reply.
 - Untuk media, caption, atau pesan yang sudah ada, reply pesan tersebut dengan `/broadcast`.
 - `/forward` wajib memakai reply karena command ini meneruskan pesan asli.
-- User yang memblokir bot atau akunnya sudah tidak aktif akan dibersihkan dari database.
+- User yang memblokir bot atau akunnya sudah tidak aktif ditandai unreachable dan tidak lagi menjadi target broadcast; histori user tetap disimpan.
 - Pengiriman dilakukan berurutan dengan jeda untuk mengurangi risiko flood limit.
 
 #### Telemetry user
@@ -147,6 +163,13 @@ Telegram tidak menyediakan presence online yang akurat untuk bot, sehingga angka
 adalah **active user**, bukan jumlah user yang sedang online secara real-time.
 User lama yang belum memiliki `last_seen_at` akan mulai dihitung sebagai active setelah
 berinteraksi kembali dengan bot.
+
+#### Control-plane agent
+
+Agent control plane bersifat optional. Tanpa `CONTROL_PLANE_URL`, deployment lama
+tetap berjalan tanpa request eksternal. Untuk menghubungkan instance ke manager,
+isi `CONTROL_PLANE_URL`, `CONTROL_PLANE_INSTANCE_ID`, dan secret unik minimal 16
+karakter pada `.env`, lalu restart bot. Production wajib menggunakan HTTPS.
 
 #### Restart
 
@@ -227,6 +250,12 @@ informasi Telegram seperti `@userinfobot`; jangan menyalin ID bot atau ID channe
 * `SOURCE_CODE_URL` URL repository source code untuk tombol di menu About
 * `BOT_STATS_TEXT` Format pesan `/stats`; gunakan `{uptime}`
 * `USER_REPLY_TEXT` Balasan untuk pesan biasa user; kosongkan untuk menonaktifkan
+* `APP_VERSION` Versi aplikasi yang dilaporkan ke control plane; default `2.2.0-dev`
+* `CONTROL_PLANE_URL` Optional HTTPS URL control plane; kosongkan untuk menonaktifkan agent
+* `CONTROL_PLANE_INSTANCE_ID` ID unik deployment, bukan secret; wajib jika `CONTROL_PLANE_URL` diisi
+* `CONTROL_PLANE_SECRET` Secret HMAC unik per deployment; wajib jika `CONTROL_PLANE_URL` diisi dan jangan dibagikan
+* `CONTROL_PLANE_HEARTBEAT_INTERVAL` Interval heartbeat dalam detik; default `60`, minimum `15`
+* `CONTROL_PLANE_TIMEOUT` Timeout request control plane dalam detik; default `10`
 
 ### Contoh optional tuning
 
@@ -248,6 +277,12 @@ MAIN_CHANNEL_URL=https://t.me/channel_saya
 SOURCE_CODE_URL=https://github.com/ndofox/teledrop-bot
 BOT_STATS_TEXT="<b>📊 Status TeleDrop</b>\n\n✅ Online\n⏱ Uptime: <code>{uptime}</code>"
 USER_REPLY_TEXT="Silakan gunakan link file yang diberikan admin atau ketik /start."
+APP_VERSION=2.2.0-dev
+CONTROL_PLANE_URL=
+CONTROL_PLANE_INSTANCE_ID=
+CONTROL_PLANE_SECRET=
+CONTROL_PLANE_HEARTBEAT_INTERVAL=60
+CONTROL_PLANE_TIMEOUT=10
 ```
 
 Semua perubahan `.env` memerlukan restart bot. Pada deployment Docker, lakukan

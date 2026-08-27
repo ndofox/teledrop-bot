@@ -3,6 +3,7 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -37,6 +38,10 @@ def _int(name: str, default: int | None = None, *, minimum: int | None = None) -
     return value
 
 
+def _optional_text(name: str) -> str:
+    return os.environ.get(name, "").strip()
+
+
 TG_BOT_TOKEN = _required("TG_BOT_TOKEN")
 APP_ID = _int("APP_ID", minimum=1)
 API_HASH = _required("API_HASH")
@@ -45,6 +50,28 @@ OWNER_ID = _int("OWNER_ID", minimum=1)
 PORT = _int("PORT", 8080, minimum=1)
 DB_URI = _required("DATABASE_URL")
 DB_NAME = os.environ.get("DATABASE_NAME", "filesharexbot").strip() or "filesharexbot"
+
+APP_VERSION = _optional_text("APP_VERSION") or "2.2.0-dev"
+CONTROL_PLANE_URL = _optional_text("CONTROL_PLANE_URL").rstrip("/")
+CONTROL_PLANE_INSTANCE_ID = _optional_text("CONTROL_PLANE_INSTANCE_ID")
+CONTROL_PLANE_SECRET = _optional_text("CONTROL_PLANE_SECRET")
+CONTROL_PLANE_HEARTBEAT_INTERVAL = _int("CONTROL_PLANE_HEARTBEAT_INTERVAL", 60, minimum=15)
+CONTROL_PLANE_TIMEOUT = _int("CONTROL_PLANE_TIMEOUT", 10, minimum=1)
+if CONTROL_PLANE_URL:
+    parsed_control_plane_url = urlparse(CONTROL_PLANE_URL)
+    is_local_http = parsed_control_plane_url.scheme == "http" and parsed_control_plane_url.hostname in {
+        "localhost", "127.0.0.1", "::1"
+    }
+    if not parsed_control_plane_url.hostname:
+        raise RuntimeError("CONTROL_PLANE_URL must include a hostname")
+    if parsed_control_plane_url.scheme != "https" and not is_local_http:
+        raise RuntimeError("CONTROL_PLANE_URL must use HTTPS (HTTP is allowed only for localhost)")
+    if not CONTROL_PLANE_INSTANCE_ID:
+        raise RuntimeError("CONTROL_PLANE_INSTANCE_ID is required when CONTROL_PLANE_URL is set")
+    if not CONTROL_PLANE_SECRET:
+        raise RuntimeError("CONTROL_PLANE_SECRET is required when CONTROL_PLANE_URL is set")
+    if len(CONTROL_PLANE_SECRET) < 16:
+        raise RuntimeError("CONTROL_PLANE_SECRET must contain at least 16 characters")
 
 # TIME controls delivered-message deletion. LINK_TTL controls link validity.
 TIME = _int("TIME", 86400, minimum=0)
