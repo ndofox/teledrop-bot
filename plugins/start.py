@@ -150,7 +150,7 @@ async def not_joined(client: Client, message: Message):
     token = extract_token(payload)
     buttons.append([
         InlineKeyboardButton(
-            "✅ SAYA SUDAH JOIN, COBA LAGI.", url=_share_link(client, token or "reload")
+            "✅ SUDAH JOIN, COBA LAGI.", url=_share_link(client, token or "reload")
         )
     ])
     markup = InlineKeyboardMarkup(buttons) if buttons else None
