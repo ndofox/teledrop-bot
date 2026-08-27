@@ -122,7 +122,7 @@ ID pada `ADMINS` adalah ID user Telegram, bukan username, ID bot, atau ID channe
 | `/genlink` | Membuat link untuk satu post di database channel | Kirim `/genlink`, lalu forward satu post dari database channel atau kirim URL post tersebut |
 | `/batch` | Membuat satu link untuk beberapa post berurutan | Kirim `/batch`, lalu forward post pertama dan terakhir |
 | `/revoke` | Mencabut link yang masih aktif | `/revoke TOKEN` atau `/revoke https://t.me/bot?start=TOKEN` |
-| `/users` | Melihat jumlah user yang tersimpan | `/users` |
+| `/users` | Melihat registered user dan active user dalam 24 jam, 7 hari, dan 30 hari terakhir | `/users` |
 | `/stats` | Melihat uptime bot | `/stats` |
 | `/ping` | Memastikan bot aktif | `/ping` |
 | `/info` | Melihat konfigurasi runtime penting | `/info` |
@@ -138,6 +138,15 @@ ID pada `ADMINS` adalah ID user Telegram, bukan username, ID bot, atau ID channe
 - `/forward` wajib memakai reply karena command ini meneruskan pesan asli.
 - User yang memblokir bot atau akunnya sudah tidak aktif akan dibersihkan dari database.
 - Pengiriman dilakukan berurutan dengan jeda untuk mengurangi risiko flood limit.
+
+#### Telemetry user
+
+`/users` menampilkan jumlah user yang pernah terdaftar serta user aktif berdasarkan
+interaksi terakhir (`last_seen_at`) dalam jendela bergulir 24 jam, 7 hari, dan 30 hari.
+Telegram tidak menyediakan presence online yang akurat untuk bot, sehingga angka ini
+adalah **active user**, bukan jumlah user yang sedang online secara real-time.
+User lama yang belum memiliki `last_seen_at` akan mulai dihitung sebagai active setelah
+berinteraksi kembali dengan bot.
 
 #### Restart
 

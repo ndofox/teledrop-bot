@@ -17,13 +17,14 @@ from config import (
     LOGGER,
 )
 from database.database import (
-    add_user, create_delivery, del_user, find_active_link, full_userbase,
-    revoke_link, utc_now,
+    create_delivery, del_user, find_active_link, full_userbase,
+    revoke_link, touch_user, user_statistics, utc_now,
 )
 from helper_func import (
     get_exp_time, get_messages, subscribed1, subscribed2, subscribed3, subscribed4,
 )
 from security import extract_token, token_hash
+from telemetry import format_user_statistics
 
 log = LOGGER(__name__)
 
@@ -43,7 +44,6 @@ def _format_user_message(template: str, user):
 @Bot.on_message(filters.command("start") & filters.private & subscribed1 & subscribed2 & subscribed3 & subscribed4)
 async def start_command(client: Client, message: Message):
     await message.reply_chat_action(ChatAction.TYPING)
-    await add_user(message.from_user.id)
     payload = message.command[1] if len(message.command) > 1 else ""
     if not payload or payload == "reload":
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("About", callback_data="about")]])
@@ -176,7 +176,8 @@ async def revoke_command(_, message: Message):
 @Bot.on_message(filters.command("users") & filters.private & filters.user(ADMINS))
 async def get_users(_, message: Message):
     status = await message.reply_text("Memproses...")
-    await status.edit_text(f"{len(await full_userbase())} user tersimpan")
+    statistics = await user_statistics()
+    await status.edit_text(format_user_statistics(statistics))
 
 
 @Bot.on_message(filters.command("help") & filters.private)
@@ -189,7 +190,7 @@ async def help_command(_, message: Message):
         "/genlink — buat link untuk satu post\n"
         "/batch — buat link untuk beberapa post\n"
         "/revoke &lt;token atau URL&gt; — cabut link\n"
-        "/users — lihat jumlah user\n"
+        "/users — lihat registered dan active user\n"
         "/stats — lihat uptime bot\n"
         "/ping — cek bot aktif\n"
         "/info — lihat konfigurasi runtime\n"
@@ -300,6 +301,22 @@ async def stats(client: Bot, message: Message):
 @Bot.on_message(filters.command("restart") & filters.private & filters.user(ADMINS))
 async def restart_notice(_, message: Message):
     await message.reply_text("Restart dilakukan oleh process supervisor.")
+
+
+@Bot.on_message(filters.private & filters.incoming, group=-2)
+async def track_private_activity(_, message: Message):
+    """Record every private interaction before regular handlers process it."""
+    user = message.from_user
+    if not user:
+        return
+    content = message.text or message.caption or ""
+    interaction_type = "command" if content.lstrip().startswith("/") else "message"
+    if interaction_type == "command" and content.lstrip().startswith("/start"):
+        interaction_type = "start"
+    try:
+        await touch_user(user.id, interaction_type=interaction_type)
+    except Exception:
+        log.exception("Could not record private user activity")
 
 
 @Bot.on_message(filters.private & filters.incoming)

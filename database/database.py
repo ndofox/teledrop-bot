@@ -16,6 +16,7 @@ from config import (
 )
 from cleanup_policy import cleanup_is_exhausted, cleanup_retry_delay
 from security import new_token, token_hash
+from telemetry import ACTIVITY_WINDOWS, activity_cutoff
 
 
 dbclient = pymongo.MongoClient(DB_URI, serverSelectionTimeoutMS=5_000)
@@ -26,6 +27,7 @@ delivery_data = database["deliveries"]
 
 
 def _ensure_indexes() -> None:
+    user_data.create_index("last_seen_at", name="users_last_seen_lookup")
     link_data.create_index("token_hash", unique=True, name="share_links_token_hash")
     link_data.create_index(
         [("expires_at", pymongo.ASCENDING), ("revoked_at", pymongo.ASCENDING)],
@@ -60,13 +62,44 @@ async def present_user(user_id: int) -> bool:
 
 
 async def add_user(user_id: int) -> None:
+    await touch_user(user_id, interaction_type="start")
+
+
+async def touch_user(user_id: int, interaction_type: str = "message") -> None:
+    """Create a user or record the latest interaction for an existing user."""
+    if not isinstance(user_id, int) or isinstance(user_id, bool) or user_id < 1:
+        raise ValueError("user_id must be a positive integer")
+    if not isinstance(interaction_type, str) or not interaction_type.strip():
+        raise ValueError("interaction_type must be a non-empty string")
+    now = utc_now()
     await asyncio.to_thread(
-        user_data.update_one, {"_id": user_id}, {"$setOnInsert": {"created_at": utc_now()}}, upsert=True
+        user_data.update_one,
+        {"_id": user_id},
+        {
+            "$setOnInsert": {"created_at": now},
+            "$set": {"last_seen_at": now, "last_interaction_type": interaction_type.strip()},
+        },
+        upsert=True,
     )
 
 
 async def full_userbase() -> list[int]:
     return await asyncio.to_thread(lambda: [doc["_id"] for doc in user_data.find({}, {"_id": 1})])
+
+
+async def user_statistics(now: datetime | None = None) -> dict[str, int]:
+    """Return registered and rolling active-user counters."""
+    reference = now or utc_now()
+
+    def _count_statistics() -> dict[str, int]:
+        statistics = {"registered": user_data.count_documents({})}
+        for name, days in ACTIVITY_WINDOWS:
+            statistics[name] = user_data.count_documents(
+                {"last_seen_at": {"$gte": activity_cutoff(days, now=reference)}}
+            )
+        return statistics
+
+    return await asyncio.to_thread(_count_statistics)
 
 
 async def del_user(user_id: int) -> None:
