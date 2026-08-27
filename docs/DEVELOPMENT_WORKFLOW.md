@@ -100,6 +100,10 @@ v2.1.0-telemetry             local telemetry
 v2.2.0-agent-foundation      instance identity and agent protocol
 ```
 
+Phase 2A server registration/heartbeat dan persistence instance sudah memiliki
+implementasi serta test lokal. Deployment production, secret manager, dan observasi
+operasional tetap menjadi pekerjaan berikutnya sebelum sistem dipakai lintas bot.
+
 ## Checklist review
 
 - [ ] Scope task sesuai phase aktif.

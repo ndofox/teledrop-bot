@@ -2,8 +2,8 @@
 
 Dokumen ini adalah catatan arsitektur berkelanjutan untuk fitur multi-bot.
 Control plane adalah service terpisah yang akan mengelola beberapa instance
-TeleDrop. Repository bot ini berisi **agent client** yang terhubung secara
-opsional; repository ini belum berisi server manager atau dashboard.
+TeleDrop. Repository ini sekarang berisi agent client dan fondasi server di
+package `control_plane_server/`; dashboard dan interface super-admin belum dibuat.
 
 ## Status implementasi
 
@@ -20,17 +20,33 @@ opsional; repository ini belum berisi server manager atau dashboard.
 - HMAC-SHA256 dengan timestamp, nonce, method, path, dan canonical JSON body
 - Health endpoint aman tanpa token atau secret
 - Test protocol yang tidak memakai Telegram, database production, atau network
+- Server Phase 2A dengan route healthz, registration, dan heartbeat (`v2.2.0-agent-server`)
+- Validasi HMAC server-side, timestamp, canonical body, dan replay nonce TTL
+- Persistence instance dan hash secret melalui repository MongoDB async wrapper
+- Test HTTP lokal dan configuration/credential tests tanpa database production
 - Workflow dokumentasi berkelanjutan dan checklist review tersedia di
   `docs/DEVELOPMENT_WORKFLOW.md`
 
-### Belum selesai
+### Berikutnya
 
-- Service server control plane dan database pusat
-- Registrasi multi-instance di manager
-- Endpoint server untuk validasi HMAC dan replay protection
+- Deployment production server control plane dan database pusat
+- Provisioning secret melalui secret manager production
+- Daftar instance dan operasi admin pada interface terautentikasi
 - Aggregated metrics lintas bot dan deduplication user global
 - Broadcast queue lintas bot dengan satu pesan per `user_id`
 - Dashboard super-admin, audit log, scheduled broadcast, dan command maintenance
+
+## Task terakhir
+
+- **Status:** Selesai untuk implementasi Phase 2A server dan test lokal
+- **Perubahan:** Server `aiohttp`, registration/heartbeat, HMAC validation,
+  timestamp/nonce replay protection, credential provisioning, repository MongoDB,
+  health check, dan konfigurasi server terpisah
+- **Validasi:** Python compile, test HTTP server, test konfigurasi/credential,
+  test protocol agent, test telemetry, test security, dan validasi `app.json`
+- **Risiko/sisa pekerjaan:** Deployment production, secret manager, backup,
+  observability, dan admin interface belum dikerjakan
+- **Commit/tag:** `v2.2.0-agent-server`
 
 ## Aturan dokumentasi berkelanjutan
 
@@ -62,6 +78,33 @@ CONTROL_PLANE_TIMEOUT=10
 Jika `CONTROL_PLANE_URL` kosong, agent nonaktif dan bot berjalan seperti deployment
 sebelumnya. URL production wajib HTTPS. HTTP hanya diperbolehkan untuk `localhost`,
 `127.0.0.1`, atau `::1` saat development.
+
+## Server control plane Phase 2A
+
+Server berada di `control_plane_server/` agar lifecycle dan konfigurasi server
+terpisah dari bot agent. Jalankan dari root project setelah menyiapkan environment
+server (contoh tersedia di `control_plane_server/.env.example`):
+
+```text
+python -m control_plane_server.main
+```
+
+Variabel server utama:
+
+```env
+CONTROL_PLANE_DATABASE_URL=mongodb+srv://USER:PASSWORD@HOST/teledrop_control
+CONTROL_PLANE_DATABASE_NAME=teledrop_control
+CONTROL_PLANE_HOST=127.0.0.1
+CONTROL_PLANE_PORT=8090
+CONTROL_PLANE_MAX_CLOCK_SKEW=300
+CONTROL_PLANE_NONCE_TTL=600
+CONTROL_PLANE_AGENT_SECRETS_JSON={"bot-01":"REPLACE_WITH_16_PLUS_CHAR_SECRET"}
+```
+
+Jangan menaruh nilai nyata pada file contoh atau repository. Untuk production,
+gunakan secret manager dan batasi endpoint server pada network yang dipercaya.
+Server Phase 2A belum memiliki endpoint daftar instance publik, admin API,
+dashboard, broadcast, atau command maintenance.
 
 ## Kontrak request agent
 

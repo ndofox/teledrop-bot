@@ -32,7 +32,7 @@ Source repository: [ndofox/teledrop-bot](https://github.com/ndofox/teledrop-bot)
 |---|---|---|
 | Phase 1 — Local telemetry | Selesai | `last_seen_at`, registered/reachable/active metrics, dan soft-state user unreachable |
 | Phase 2 — Agent identity & registration foundation | Selesai | Instance ID, metadata bot, signed registration/heartbeat, dan health metadata |
-| Phase 2A — Control-plane server | Berikutnya | Server validasi HMAC, replay protection, dan daftar instance |
+| Phase 2A — Control-plane server | Selesai | Server validasi HMAC, replay protection, registration, heartbeat, dan persistence instance |
 | Phase 2B — Central metrics | Direncanakan | Ingestion telemetry dan agregasi lintas bot |
 | Phase 3 — Super broadcast | Direncanakan | Queue lintas bot dengan satu pesan per Telegram `user_id` |
 | Phase 4 — Super-admin interface | Direncanakan | Telegram manager bot dan web dashboard |
@@ -42,6 +42,13 @@ Detail kontrak agent, keamanan, keputusan arsitektur, dan roadmap berkelanjutan 
 Workflow development dan checklist yang dapat dibagikan ada di
 [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md). Instruksi privat
 untuk coding agent berada di `.clinerules/`, di-ignore Git, dan tidak dibagikan.
+
+Server control plane berada di package terisolasi `control_plane_server/` dan dapat
+dijalankan sebagai service terpisah. Implementasi Phase 2A sudah mencakup endpoint
+health, registration, heartbeat, HMAC validation, replay protection, dan persistence
+instance. Konfigurasi server tidak menggunakan
+`DATABASE_URL` atau token bot; gunakan variabel `CONTROL_PLANE_*` khusus server.
+Contoh konfigurasi tersedia di `control_plane_server/.env.example`.
 
 ### Setup
 
