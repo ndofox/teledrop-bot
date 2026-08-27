@@ -119,13 +119,24 @@ async def start_command(client: Client, message: Message):
 
 
 def _force_sub_buttons(client):
-    buttons = []
+    channel_buttons = []
     for index, channel_id in enumerate(
         [FORCE_SUB_CHANNEL1, FORCE_SUB_CHANNEL2, FORCE_SUB_CHANNEL3, FORCE_SUB_CHANNEL4], 1
     ):
         if channel_id:
-            buttons.append([InlineKeyboardButton(f"Join channel {index}", url=getattr(client, f"invitelink{index}"))])
-    return buttons
+            channel_buttons.append(
+                InlineKeyboardButton(
+                    f"JOIN CHANNEL {index}", url=getattr(client, f"invitelink{index}")
+                )
+            )
+
+    if len(channel_buttons) == 4:
+        return [channel_buttons[:2], channel_buttons[2:]]
+    if len(channel_buttons) == 3:
+        return [[channel_buttons[0]], channel_buttons[1:]]
+    if len(channel_buttons) == 2:
+        return [channel_buttons]
+    return [[button] for button in channel_buttons]
 
 
 @Bot.on_message(
@@ -139,7 +150,7 @@ async def not_joined(client: Client, message: Message):
     token = extract_token(payload)
     buttons.append([
         InlineKeyboardButton(
-            "🔄 Muat ulang", url=_share_link(client, token or "reload")
+            "COBA LAGI", url=_share_link(client, token or "reload")
         )
     ])
     markup = InlineKeyboardMarkup(buttons) if buttons else None
