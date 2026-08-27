@@ -20,6 +20,8 @@ opsional; repository ini belum berisi server manager atau dashboard.
 - HMAC-SHA256 dengan timestamp, nonce, method, path, dan canonical JSON body
 - Health endpoint aman tanpa token atau secret
 - Test protocol yang tidak memakai Telegram, database production, atau network
+- Workflow dokumentasi berkelanjutan dan checklist review tersedia di
+  `docs/DEVELOPMENT_WORKFLOW.md`
 
 ### Belum selesai
 
@@ -29,6 +31,22 @@ opsional; repository ini belum berisi server manager atau dashboard.
 - Aggregated metrics lintas bot dan deduplication user global
 - Broadcast queue lintas bot dengan satu pesan per `user_id`
 - Dashboard super-admin, audit log, scheduled broadcast, dan command maintenance
+
+## Aturan dokumentasi berkelanjutan
+
+`docs/CONTROL_PLANE.md` adalah sumber utama konteks arsitektur dan status phase.
+Setiap task yang mengubah arsitektur, code control plane, telemetry, schema,
+protocol, konfigurasi, keamanan, deployment, roadmap, atau status milestone wajib
+memperbarui dokumen ini setelah implementasi dan validasi selesai.
+
+`README.md` diperbarui jika task berdampak pada fitur user, command, konfigurasi,
+deployment, setup, atau status umum project. Workflow publik dan checklist tersedia
+di [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md). Instruksi privat agent
+berada di `.clinerules/` dan tidak boleh di-commit atau dibagikan.
+
+Status milestone hanya boleh diubah menjadi `Selesai` jika code, test, validasi,
+dan dokumentasinya sudah selesai. Setiap perubahan status harus menyebutkan risiko,
+pekerjaan tersisa, serta commit/tag bila ada.
 
 ## Konfigurasi agent
 

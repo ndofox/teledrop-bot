@@ -39,6 +39,9 @@ Source repository: [ndofox/teledrop-bot](https://github.com/ndofox/teledrop-bot)
 
 Detail kontrak agent, keamanan, keputusan arsitektur, dan roadmap berkelanjutan ada di
 [`docs/CONTROL_PLANE.md`](docs/CONTROL_PLANE.md).
+Workflow development dan checklist yang dapat dibagikan ada di
+[`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md). Instruksi privat
+untuk coding agent berada di `.clinerules/`, di-ignore Git, dan tidak dibagikan.
 
 ### Setup
 
