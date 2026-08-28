@@ -33,7 +33,7 @@ Source repository: [ndofox/teledrop-bot](https://github.com/ndofox/teledrop-bot)
 | Phase 1 — Local telemetry | Selesai | `last_seen_at`, registered/reachable/active metrics, dan soft-state user unreachable |
 | Phase 2 — Agent identity & registration foundation | Selesai | Instance ID, metadata bot, signed registration/heartbeat, dan health metadata |
 | Phase 2A — Control-plane server | Selesai | Server validasi HMAC, replay protection, registration, heartbeat, dan persistence instance |
-| Phase 2B — Central metrics | Direncanakan | Ingestion telemetry dan agregasi lintas bot |
+| Phase 2B — Central metrics (ingestion) | Sedang | Ingestion aggregate-only (foundation implemented & tested); external read API pending |
 | Phase 3 — Super broadcast | Direncanakan | Queue lintas bot dengan satu pesan per Telegram `user_id` |
 | Phase 4 — Super-admin interface | Direncanakan | Telegram manager bot dan web dashboard |
 
@@ -266,6 +266,20 @@ informasi Telegram seperti `@userinfobot`; jangan menyalin ID bot atau ID channe
 * `CONTROL_PLANE_SECRET` Secret HMAC unik per deployment; wajib jika `CONTROL_PLANE_URL` diisi dan jangan dibagikan
 * `CONTROL_PLANE_HEARTBEAT_INTERVAL` Interval heartbeat dalam detik; default `60`, minimum `15`
 * `CONTROL_PLANE_TIMEOUT` Timeout request control plane dalam detik; default `10`
+* `CONTROL_PLANE_METRICS_ENABLED` Aktifkan sync metrics agregat ke control plane; default `False`
+* `CONTROL_PLANE_METRICS_INTERVAL` Interval sync metrics dalam detik; default `3600`, rentang `300`–`86400`
+* `CONTROL_PLANE_METRICS_DAILY_WINDOW` Jumlah tanggal kalender UTC yang dikirim per snapshot; default `30`, rentang `1`–`90`
+* `CONTROL_PLANE_METRICS_RETRY_MAX_ATTEMPTS` Batas percobaan ulang outbox metrics; default `5`
+* `CONTROL_PLANE_METRICS_RETRY_BASE_SECONDS`/`RETRY_MAX_SECONDS` Backoff retry outbox; default `60`/`3600`; ditambah bounded equal jitter (≤25% base) dan di-cap pada `RETRY_MAX_SECONDS`
+* `CONTROL_PLANE_METRICS_OUTBOX_ACCEPTED_RETENTION_DAYS` Lama simpan record outbox accepted; default `7`
+* `CONTROL_PLANE_METRICS_OUTBOX_PERMANENT_RETENTION_DAYS` Lama simpan record `permanent_failure`; default `30`
+* `CONTROL_PLANE_METRICS_OUTBOX_CLEANUP_LIMIT` Batas record dibersihkan per siklus; default `100`
+* `CONTROL_PLANE_METRICS_OUTBOX_LEASE_SECONDS` Lease klaim outbox; default `3600`
+
+Metrics hanya dikirim sebagai **aggregate** (tanpa `user_id` central). Pernyataan 401/403
+diisolasi ke state `blocked_auth` sehingga tidak menghasilkan record permanent baru
+di setiap interval; payload diretry dengan bounded backoff sampai kredensial diperbaiki.
+External HTTP read API (summary/dashboard) belum tersedia di Phase 2B.
 
 ### Contoh optional tuning
 
@@ -293,6 +307,9 @@ CONTROL_PLANE_INSTANCE_ID=
 CONTROL_PLANE_SECRET=
 CONTROL_PLANE_HEARTBEAT_INTERVAL=60
 CONTROL_PLANE_TIMEOUT=10
+CONTROL_PLANE_METRICS_ENABLED=False
+CONTROL_PLANE_METRICS_INTERVAL=3600
+CONTROL_PLANE_METRICS_DAILY_WINDOW=30
 ```
 
 Semua perubahan `.env` memerlukan restart bot. Pada deployment Docker, lakukan

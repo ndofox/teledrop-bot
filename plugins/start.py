@@ -18,7 +18,7 @@ from config import (
 )
 from database.database import (
     create_delivery, find_active_link, mark_user_unreachable, reachable_userbase,
-    revoke_link, touch_user, user_statistics, utc_now,
+    record_user_activity, revoke_link, user_statistics, utc_now,
 )
 from helper_func import (
     get_exp_time, get_messages, subscribed1, subscribed2, subscribed3, subscribed4,
@@ -314,7 +314,7 @@ async def track_private_activity(_, message: Message):
     if interaction_type == "command" and content.lstrip().startswith("/start"):
         interaction_type = "start"
     try:
-        await touch_user(user.id, interaction_type=interaction_type)
+        await record_user_activity(user.id, interaction_type=interaction_type)
     except Exception:
         log.exception("Could not record private user activity")
 

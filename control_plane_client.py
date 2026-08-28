@@ -3,12 +3,25 @@
 import asyncio
 import secrets
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
 import aiohttp
 
-from control_plane import HEARTBEAT_PATH, REGISTER_PATH, canonical_json, signed_headers
+from control_plane import HEARTBEAT_PATH, METRICS_PATH, REGISTER_PATH, canonical_json, signed_headers
+
+
+@dataclass(frozen=True)
+class MetricsSendResult:
+    """Classify one aggregate metrics send for retry/idempotency decisions."""
+
+    status_code: int
+    ok: bool = False
+    retryable: bool = False
+    permanent: bool = False
+    duplicate: bool = False
+    agent_not_registered: bool = False
 
 
 class ControlPlaneClient:
@@ -52,6 +65,45 @@ class ControlPlaneClient:
         except (aiohttp.ClientError, asyncio.TimeoutError):
             self.last_error = "request failed"
             return False
+
+    async def send_metrics(self, body: str) -> MetricsSendResult:
+        """Send an exact canonical aggregate body and classify the outcome."""
+        if not self.enabled:
+            return MetricsSendResult(status_code=0, permanent=True)
+        timestamp = str(int(time.time()))
+        nonce = secrets.token_urlsafe(16)
+        headers = signed_headers(self._secret, timestamp, nonce, "POST", METRICS_PATH, body)
+        try:
+            session = await self._session_or_create()
+            async with session.post(
+                self.base_url + METRICS_PATH, data=body.encode("utf-8"), headers=headers
+            ) as response:
+                status = response.status
+                ok = False
+                duplicate = False
+                try:
+                    data = await response.json()
+                    if isinstance(data, dict):
+                        ok = data.get("status") in ("accepted", "duplicate")
+                        duplicate = data.get("status") == "duplicate"
+                        agent_not_registered = data.get("error_code") == "agent_not_registered"
+                    else:
+                        agent_not_registered = False
+                except (ValueError, TypeError):
+                    agent_not_registered = False
+                if ok:
+                    self.last_success_at = datetime.now(timezone.utc)
+                    self.last_error = None
+                    return MetricsSendResult(status_code=status, ok=True, duplicate=duplicate)
+                self.last_error = f"HTTP {status}"
+                if status == 404 and agent_not_registered:
+                    return MetricsSendResult(status_code=status, retryable=True, agent_not_registered=True)
+                if status in (429, 500, 502, 503, 504):
+                    return MetricsSendResult(status_code=status, retryable=True)
+                return MetricsSendResult(status_code=status, permanent=True)
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            self.last_error = "request failed"
+            return MetricsSendResult(status_code=0, retryable=True)
 
     async def register(self, payload: Mapping[str, Any]) -> bool:
         return await self.post(REGISTER_PATH, payload)

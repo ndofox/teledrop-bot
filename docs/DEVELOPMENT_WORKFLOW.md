@@ -100,9 +100,29 @@ v2.1.0-telemetry             local telemetry
 v2.2.0-agent-foundation      instance identity and agent protocol
 ```
 
-Phase 2A server registration/heartbeat dan persistence instance sudah memiliki
-implementasi serta test lokal. Deployment production, secret manager, dan observasi
-operasional tetap menjadi pekerjaan berikutnya sebelum sistem dipakai lintas bot.
+Phase 2A server registration/heartbeat serta Phase 2B aggregate metrics sudah
+memiliki implementasi dan test lokal. Deployment production, secret manager, dan
+observasi operasional tetap menjadi pekerjaan berikutnya sebelum sistem dipakai
+lintas bot.
+
+Jalankan kedua suite melalui fresh subprocess terpisah saat memvalidasi control plane.
+Repository root harus ditetapkan sebagai top-level directory agar package identity
+tetap benar:
+
+```text
+python -m unittest discover -s tests -t . -v
+python -m unittest discover -s control_plane_server/tests -t . -v
+```
+
+Kedua suite memuat bootstrap hermetic test-only (`tests/_hermetic_environment.py`)
+lewat package initializer sebelum root `config.py` diimpor. Bootstrap mengarahkan
+`LOG_FILE_NAME` ke direktori temporary di luar repository sehingga production
+`RotatingFileHandler` tidak membuat/mengubah `filesharingbot.log` di repository
+root, dan membersihkan hanya direktori temporary buatannya sendiri saat proses
+test berakhir.
+
+`python -m unittest discover -s control_plane_server -v` bukan command yang
+didukung. Entrypoint control-plane tetap `python -m control_plane_server.main`.
 
 ## Checklist review
 

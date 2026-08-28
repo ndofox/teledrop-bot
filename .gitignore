@@ -116,6 +116,7 @@ venv.bak/
 
 # Local AI agent instructions and private project context
 .clinerules/
+.cline/
 
 # Telegram/Pyrogram local session files
 *.session

@@ -19,6 +19,11 @@ class ServerConfig:
     port: int = 8090
     max_clock_skew_seconds: int = 300
     nonce_ttl_seconds: int = 600
+    metrics_daily_max: int = 30
+    max_body_bytes: int = 65536
+    processing_lease_seconds: int = 300
+    batch_retention_days: int = 30
+    metrics_cleanup_limit: int = 100
 
 
 def _required(name: str) -> str:
@@ -28,7 +33,7 @@ def _required(name: str) -> str:
     return value
 
 
-def _positive_int(name: str, default: int) -> int:
+def _positive_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
     raw = os.environ.get(name, "").strip()
     if not raw:
         return default
@@ -36,8 +41,10 @@ def _positive_int(name: str, default: int) -> int:
         value = int(raw)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be an integer") from exc
-    if value < 1:
-        raise RuntimeError(f"{name} must be >= 1")
+    if value < minimum:
+        raise RuntimeError(f"{name} must be >= {minimum}")
+    if value > maximum:
+        raise RuntimeError(f"{name} must be <= {maximum}")
     return value
 
 
@@ -69,7 +76,12 @@ def load_config() -> ServerConfig:
         or "teledrop_control",
         agent_secrets=_parse_agent_secrets(_required("CONTROL_PLANE_AGENT_SECRETS_JSON")),
         host=os.environ.get("CONTROL_PLANE_HOST", "127.0.0.1").strip() or "127.0.0.1",
-        port=_positive_int("CONTROL_PLANE_PORT", 8090),
-        max_clock_skew_seconds=_positive_int("CONTROL_PLANE_MAX_CLOCK_SKEW", 300),
-        nonce_ttl_seconds=_positive_int("CONTROL_PLANE_NONCE_TTL", 600),
+        port=_positive_int("CONTROL_PLANE_PORT", 8090, minimum=1, maximum=65535),
+        max_clock_skew_seconds=_positive_int("CONTROL_PLANE_MAX_CLOCK_SKEW", 300, minimum=1, maximum=86400),
+        nonce_ttl_seconds=_positive_int("CONTROL_PLANE_NONCE_TTL", 600, minimum=30, maximum=86400),
+        metrics_daily_max=_positive_int("CONTROL_PLANE_METRICS_DAILY_MAX", 30, minimum=1, maximum=90),
+        max_body_bytes=_positive_int("CONTROL_PLANE_REQUEST_MAX_BODY_BYTES", 65536, minimum=1024, maximum=1048576),
+        processing_lease_seconds=_positive_int("CONTROL_PLANE_METRICS_PROCESSING_LEASE_SECONDS", 300, minimum=10, maximum=3600),
+        batch_retention_days=_positive_int("CONTROL_PLANE_METRICS_BATCH_RETENTION_DAYS", 30, minimum=1, maximum=365),
+        metrics_cleanup_limit=_positive_int("CONTROL_PLANE_METRICS_CLEANUP_LIMIT", 100, minimum=1, maximum=100000),
     )

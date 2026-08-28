@@ -16,6 +16,7 @@ __pycache__/
 .git/
 .gitignore
 .clinerules/
+.cline/
 
 # Local logs and generated files
 *.log

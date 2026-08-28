@@ -22,7 +22,7 @@ def _required(name: str) -> str:
     return value
 
 
-def _int(name: str, default: int | None = None, *, minimum: int | None = None) -> int:
+def _int(name: str, default: int | None = None, *, minimum: int | None = None, maximum: int | None = None) -> int:
     raw = os.environ.get(name)
     if raw is None or not raw.strip():
         if default is None:
@@ -35,11 +35,17 @@ def _int(name: str, default: int | None = None, *, minimum: int | None = None) -
         raise RuntimeError(f"{name} must be an integer") from exc
     if minimum is not None and value < minimum:
         raise RuntimeError(f"{name} must be >= {minimum}")
+    if maximum is not None and value > maximum:
+        raise RuntimeError(f"{name} must be <= {maximum}")
     return value
 
 
 def _optional_text(name: str) -> str:
     return os.environ.get(name, "").strip()
+
+
+def _bool_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 TG_BOT_TOKEN = _required("TG_BOT_TOKEN")
@@ -57,6 +63,29 @@ CONTROL_PLANE_INSTANCE_ID = _optional_text("CONTROL_PLANE_INSTANCE_ID")
 CONTROL_PLANE_SECRET = _optional_text("CONTROL_PLANE_SECRET")
 CONTROL_PLANE_HEARTBEAT_INTERVAL = _int("CONTROL_PLANE_HEARTBEAT_INTERVAL", 60, minimum=15)
 CONTROL_PLANE_TIMEOUT = _int("CONTROL_PLANE_TIMEOUT", 10, minimum=1)
+# Aggregate metrics sync is disabled by default and must be enabled explicitly.
+CONTROL_PLANE_METRICS_ENABLED = _bool_env("CONTROL_PLANE_METRICS_ENABLED")
+CONTROL_PLANE_METRICS_INTERVAL = _int("CONTROL_PLANE_METRICS_INTERVAL", 3600, minimum=300, maximum=86400)
+CONTROL_PLANE_METRICS_DAILY_WINDOW = _int("CONTROL_PLANE_METRICS_DAILY_WINDOW", 30, minimum=1, maximum=90)
+CONTROL_PLANE_METRICS_OUTBOX_ACCEPTED_RETENTION_DAYS = _int(
+    "CONTROL_PLANE_METRICS_OUTBOX_ACCEPTED_RETENTION_DAYS", 7, minimum=1, maximum=365
+)
+CONTROL_PLANE_METRICS_OUTBOX_PERMANENT_RETENTION_DAYS = _int(
+    "CONTROL_PLANE_METRICS_OUTBOX_PERMANENT_RETENTION_DAYS", 30, minimum=1, maximum=365
+)
+CONTROL_PLANE_METRICS_OUTBOX_CLEANUP_LIMIT = _int(
+    "CONTROL_PLANE_METRICS_OUTBOX_CLEANUP_LIMIT", 100, minimum=1
+)
+CONTROL_PLANE_METRICS_OUTBOX_LEASE_SECONDS = _int(
+    "CONTROL_PLANE_METRICS_OUTBOX_LEASE_SECONDS", 3600, minimum=10
+)
+CONTROL_PLANE_METRICS_RETRY_MAX_ATTEMPTS = _int(
+    "CONTROL_PLANE_METRICS_RETRY_MAX_ATTEMPTS", 5, minimum=1
+)
+CONTROL_PLANE_METRICS_RETRY_BASE_SECONDS = _int("CONTROL_PLANE_METRICS_RETRY_BASE_SECONDS", 60, minimum=1)
+CONTROL_PLANE_METRICS_RETRY_MAX_SECONDS = _int("CONTROL_PLANE_METRICS_RETRY_MAX_SECONDS", 3600, minimum=1)
+if CONTROL_PLANE_METRICS_RETRY_MAX_SECONDS < CONTROL_PLANE_METRICS_RETRY_BASE_SECONDS:
+    raise RuntimeError("CONTROL_PLANE_METRICS_RETRY_MAX_SECONDS must be >= CONTROL_PLANE_METRICS_RETRY_BASE_SECONDS")
 if CONTROL_PLANE_URL:
     parsed_control_plane_url = urlparse(CONTROL_PLANE_URL)
     is_local_http = parsed_control_plane_url.scheme == "http" and parsed_control_plane_url.hostname in {

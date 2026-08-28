@@ -7,11 +7,25 @@ import re
 import time
 from typing import Any, Mapping
 
-from control_plane import PROTOCOL_VERSION, canonical_json, request_signature
+from control_plane import (
+    FORBIDDEN_METRICS_FIELDS,
+    METRICS_ALLOWED_CURRENT_FIELDS,
+    METRICS_ALLOWED_DAILY_FIELDS,
+    METRICS_ALLOWED_TOP_FIELDS,
+    METRICS_SCHEMA_VERSION,
+    PRIVACY_MODE_AGGREGATE_ONLY,
+    PROTOCOL_VERSION,
+    aggregate_batch_id,
+    aggregate_batch_material_from_payload,
+    canonical_json,
+    request_signature,
+)
+from control_plane_server.config import INSTANCE_ID_PATTERN
 
 
 SIGNATURE_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 MAX_NONCE_LENGTH = 128
+DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 @dataclass(frozen=True)
@@ -105,8 +119,6 @@ def parse_started_at(value: Any) -> datetime:
 
 
 def validate_common_payload(payload: Mapping[str, Any]) -> None:
-    from control_plane_server.config import INSTANCE_ID_PATTERN
-
     instance_id = payload.get("instance_id")
     bot_id = payload.get("telegram_bot_id")
     version = payload.get("version")
@@ -137,3 +149,98 @@ def validate_heartbeat_payload(payload: Mapping[str, Any]) -> None:
         raise ValueError("invalid uptime_seconds")
     if status not in {"online", "stopping", "offline"}:
         raise ValueError("invalid status")
+
+
+def _validate_metric_datetime(value: Any, name: str) -> None:
+    try:
+        parse_started_at(value)
+    except ValueError as exc:
+        raise ValueError(f"invalid {name}") from exc
+
+
+def _validate_non_negative_count(value: Any, name: str) -> None:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"invalid {name}")
+
+
+def _validate_fields_only(value: Mapping[str, Any], allowed: frozenset, name: str) -> None:
+    unknown = set(value) - set(allowed)
+    if unknown:
+        raise ValueError(f"unknown {name} fields")
+
+
+def _validate_utc_date(value: Any, name: str) -> None:
+    if not isinstance(value, str) or not DATE_PATTERN.fullmatch(value):
+        raise ValueError(f"invalid {name}")
+    from datetime import datetime as _dt
+    import time as _time
+
+    try:
+        _dt.strptime(value, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError(f"invalid {name}") from exc
+
+
+# Metrics observed timestamps must not be unreasonably far in the future.
+MAX_METRIC_FUTURE_SECONDS = 900
+
+
+def validate_metrics_payload(payload: Mapping[str, Any], *, max_daily: int = 30,
+                             now: datetime | None = None) -> None:
+    from datetime import timedelta
+
+    unknown = set(payload) - set(METRICS_ALLOWED_TOP_FIELDS)
+    if unknown:
+        raise ValueError("unknown fields")
+    forbidden = FORBIDDEN_METRICS_FIELDS & set(payload)
+    if forbidden:
+        raise ValueError("forbidden fields")
+
+    instance_id = payload.get("instance_id")
+    if not isinstance(instance_id, str) or not INSTANCE_ID_PATTERN.fullmatch(instance_id):
+        raise ValueError("invalid instance_id")
+    if not isinstance(payload.get("batch_id"), str) or not re.fullmatch(r"[0-9a-f]{64}", payload["batch_id"]):
+        raise ValueError("invalid batch_id")
+    if payload.get("protocol_version") != PROTOCOL_VERSION:
+        raise ValueError("invalid protocol_version")
+    if payload.get("metrics_schema_version") != METRICS_SCHEMA_VERSION:
+        raise ValueError("unsupported metrics schema")
+    if payload.get("privacy_mode") != PRIVACY_MODE_AGGREGATE_ONLY:
+        raise ValueError("unsupported privacy mode")
+
+    try:
+        observed_at = parse_started_at(payload.get("observed_at"))
+    except ValueError as exc:
+        raise ValueError("invalid observed_at") from exc
+    if now is not None and observed_at > now + timedelta(seconds=MAX_METRIC_FUTURE_SECONDS):
+        raise ValueError("invalid observed_at")
+
+    current = payload.get("current")
+    if not isinstance(current, dict):
+        raise ValueError("invalid current")
+    _validate_fields_only(current, METRICS_ALLOWED_CURRENT_FIELDS, "current")
+    for field in METRICS_ALLOWED_CURRENT_FIELDS:
+        _validate_non_negative_count(current.get(field), field)
+
+    daily = payload.get("daily")
+    if not isinstance(daily, list):
+        raise ValueError("invalid daily")
+    if not daily:
+        raise ValueError("invalid daily")
+    if len(daily) > max_daily:
+        raise ValueError("daily is too large")
+    seen_dates: set[str] = set()
+    for item in daily:
+        if not isinstance(item, dict) or set(item) != set(METRICS_ALLOWED_DAILY_FIELDS):
+            raise ValueError("invalid daily entry")
+        _validate_utc_date(item["date_utc"], "date_utc")
+        if item["date_utc"] in seen_dates:
+            raise ValueError("duplicate daily entry")
+        seen_dates.add(item["date_utc"])
+        _validate_non_negative_count(item["active_users"], "active_users")
+        _validate_non_negative_count(item["interaction_count"], "interaction_count")
+        _validate_metric_datetime(item["observed_at"], "observed_at")
+
+    expected_batch_id = aggregate_batch_id(aggregate_batch_material_from_payload(payload))
+    if not hmac.compare_digest(expected_batch_id, payload["batch_id"]):
+        raise ValueError("invalid batch_id")
